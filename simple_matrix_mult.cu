@@ -15,12 +15,14 @@ __global__ void matrixMul(const int *a, const int *b, int *c, int N) {
   int col = blockIdx.x * blockDim.x + threadIdx.x;
 
   // итерация по строке и вниз по столбцу
-  c[row * N + col] = 0;
-  for (int k = 0; k < N; k++) {
-    // считаем результат для матрицы с
-    c[row * N + col] += a[row * N + k] * b[k * N + col];
+  if (row < N && col < N) {
+    int temp_sum = 0;
+    for (int k = 0; k < N; k++) {
+        // считаем результат для матрицы с
+        temp_sum += a[row * N + k] * b[k * N + col];
+    }
+    c[row * N + col] = temp_sum;
   }
-  c[row * N + col] = a[row * N +col];
 }
 
 // проверка результатов на CPU
@@ -34,11 +36,9 @@ void verify_result(vector<int> &a, vector<int> &b, vector<int> &c, int N) {
             //вычисляем произведение и суммируем
             tmp += a[i * N + k] * b[k * N + j];
         }
-        // cout << tmp << "cpu\n";
 
         // Check against the CPU result
-        // cout << c[i*N+j] << "res\n";
-        // assert(tmp == c[i * N + j]);
+        assert(tmp == c[i * N + j]);
     }
   }
 }
@@ -72,17 +72,11 @@ int main() {
   int THREADS = 32;
 
   // определяем количество блоков
-  int BLOCKS = N / THREADS;
+  int BLOCKS = (N + THREADS - 1) / THREADS;
 
   // задаем размеры, используя конструкцию dim3
   dim3 threads(THREADS, THREADS);
   dim3 blocks(BLOCKS, BLOCKS);
-
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
-        cout << h_a[i*N+j] << " el_value in matrix a\n";
-    }
-  }
 
   // запускаем ядро
   matrixMul<<<blocks, threads>>>(d_a, d_b, d_c, N);
@@ -90,14 +84,32 @@ int main() {
   // копируем на host
   cudaMemcpy(h_c.data(), d_c, bytes, cudaMemcpyDeviceToHost);
 
-  for (int i = 0; i < N; i++) {
-    for (int j = 0; j < N; j++) {
-        cout << h_c[i*N+j] << " el_value in matrix c\n";
-    }
-  }
-
   // проверяем результаты
   verify_result(h_a, h_b, h_c, N);
+
+  cout << "matrix A \n";
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < N; j++) {
+        cout << h_a[i*N+j] << " ";
+    }
+    cout << "\n";
+  }
+
+  cout << "matrix B \n";
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < N; j++) {
+        cout << h_b[i*N+j] << " ";
+    }
+    cout << "\n";
+  }
+
+  cout << "matrix C \n";
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < N; j++) {
+        cout << h_c[i*N+j] << " ";
+    }
+    cout << "\n";
+  }
 
   cout << "COMPLETED SUCCESSFULLY\n";
   
